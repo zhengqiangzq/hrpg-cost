@@ -1,0 +1,71 @@
+import request from '@/utils/request'
+
+// 查询全部服务单元
+export function allServiceUnit(params) {
+    return request({
+        url: '/methodService/serviceUnit/all',
+        method: 'get',
+        params,
+        btnCode: 'diseaseCostServiceUnit:list'
+    })
+}
+
+// 分页查询服务单元
+export function pageServiceUnit(params) {
+    return request({
+        url: '/methodService/serviceUnit/page',
+        method: 'get',
+        params,
+        btnCode: 'diseaseCostServiceUnit:list'
+    })
+}
+
+// 查询服务单元明细
+export function oneServiceUnit(id) {
+    return request({
+        url: `/methodService/serviceUnit/${id}`,
+        method: 'get',
+        btnCode: 'diseaseCostServiceUnit:list'
+    })
+}
+
+// 新增服务单元
+export function addServiceUnit(data) {
+    return request({
+        url: '/methodService/serviceUnit',
+        method: 'post',
+        data,
+        btnCode: 'diseaseCostServiceUnit:add'
+    })
+}
+
+// 编辑服务单元
+export function updateServiceUnit(data) {
+    return request({
+        url: '/methodService/serviceUnit/byPost',
+        method: 'post',
+        data,
+        btnCode: 'diseaseCostServiceUnit:update'
+    })
+}
+
+// 删除服务单元
+export function deleteServiceUnit(data) {
+    return request({
+        url: '/methodService/serviceUnit/byDelete',
+        method: 'post',
+        data,
+        btnCode: 'diseaseCostServiceUnit:delete'
+    })
+}
+
+// 导出服务单元
+export function exportServiceUnit(data) {
+    return request({
+        url: '/methodService/serviceUnit/excel',
+        method: 'post',
+        data,
+        responseType: 'blob',
+        btnCode: 'diseaseCostServiceUnit:export'
+    })
+}

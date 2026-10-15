@@ -1,0 +1,363 @@
+<script setup>
+import {getCurrentInstance, onMounted, reactive} from "vue";
+import {useChart} from "@/views/comprehensiveAnalysis/components/useChart";
+import ReportCharts from '@/views/comprehensiveAnalysis/components/reportCharts/index.vue'
+import {dict_cost_type, dict_dept_level} from "@/views/comprehensiveAnalysis/common/fakeDict";
+import {useSelectTableData} from "@/components/SelectTableData/useSelectTableData";
+import {errorMessage} from "@/views/comprehensiveAnalysis/common/messageUtil";
+import detail from './detail.vue'
+import {periodMonthByDate} from "@/api/base";
+import {sectiontree} from "@/api/accountingDepartment";
+import moment from "moment/moment";
+import {contributionMarginAnalysisList, pageApportionmentLevelList} from "@/api/deptCost/contributionVisitCost";
+
+const PERMISSION_CODE = 'visitCost:marginalContributionAnalysis'
+defineOptions({
+  name: PERMISSION_CODE
+})
+
+const { proxy } = getCurrentInstance()
+
+const filterInfo = reactive({
+  query: {
+    costType: '1',
+    level: '8',
+    type: 1,
+  },
+  copyQuery: {},
+  options: {
+    deptLevel: dict_dept_level,
+    costType: dict_cost_type,
+  },
+  list: [
+    {label: '开始分析期间', value: 'analysisStartPeriodName', required: true, showLabel: true, type: 'slot'},
+    {label: '结束分析期间', value: 'analysisEndPeriodName', required: true, showLabel: true, type: 'slot'},
+    {label: '科室级次', value: 'level', type: 'select', clearable: false, required: true, list: 'deptLevel'},
+    {label: '成本类型', value: 'costType', clearable: false, required: true, type: 'select', list: 'costType'},
+    {type: 'button', label: '查询', btType: 'primary', event: search},
+    {type: 'button', label: '重置', event: reset},
+  ],
+  btnList: [
+    {
+      type: 'button',
+      label: '导出Excel',
+      show: proxy.$permission(`${PERMISSION_CODE}:export`),
+      event: () => exportData()
+    }
+  ]
+})
+
+const filterRef = ref()
+const {tableParameter, openDialog} = useSelectTableData()
+
+const {chartRef: pieRef, setData: pieSetData, setOption: pieSetOption} = useChart({
+  title: {text: '诊次收益、诊次边际贡献四象限'},
+})
+const {chartRef: barChartRef, setData: barSetData, setOption: barSetOption} = useChart({
+  title: {text: '诊次收入成本分布图'},
+})
+
+const tableInfo = reactive({
+  fieldList: [
+    {label: '科室编码', value: 'deptCode'},
+    {label: '科室名称', value: 'deptName'},
+    {label: '门急诊人次', value: 'workNum'},
+    {label: '总收入', value: 'totalIncome', headAlign: 'center', align: 'right', type: 'slot'},
+    {label: '诊次收入', value: 'avgTotalIncome', align: 'right', formatter: row => proxy.$fn.TripartiteMethod(row.avgTotalIncome)},
+    {label: '总成本', value: 'totalCost', headAlign: 'center', align: 'right', type: 'slot'},
+    {label: '诊次成本', value: 'avgTotalCost', align: 'right', formatter: row => proxy.$fn.TripartiteMethod(row.avgTotalCost) },
+    {
+      label: '诊次直接成本', type: 'multiHeader', children: [
+        {
+          label: '固定成本',
+          value: 'avgDirectFixedCost',
+          headAlign: 'center',
+          align: 'right',
+          formatter: row => proxy.$fn.TripartiteMethod(row.avgDirectFixedCost)
+        },
+        {
+          label: '变动成本',
+          value: 'avgDirectInFixedCost',
+          headAlign: 'center',
+          align: 'right',
+          formatter: row => proxy.$fn.TripartiteMethod(row.avgDirectInFixedCost)
+        },
+        {
+          label: '合计',
+          value: 'avgDirectCost',
+          headAlign: 'center',
+          align: 'right',
+          formatter: row => proxy.$fn.TripartiteMethod(row.avgDirectCost)
+        },
+      ]
+    },
+    {
+      label: '诊次间接成本', type: 'multiHeader', children: [
+        {
+          label: '固定成本',
+          value: 'avgInDirectFixedCost',
+          headAlign: 'center',
+          align: 'right',
+          formatter: row => proxy.$fn.TripartiteMethod(row.avgInDirectFixedCost)
+        },
+        {
+          label: '变动成本',
+          value: 'avgInDirectInFixedCost',
+          headAlign: 'center',
+          align: 'right',
+          formatter: row => proxy.$fn.TripartiteMethod(row.avgInDirectInFixedCost)
+        },
+        {
+          label: '合计',
+          value: 'avgInDirectCost',
+          headAlign: 'center',
+          align: 'right',
+          formatter: row => proxy.$fn.TripartiteMethod(row.avgInDirectCost)
+        },
+      ]
+    },
+    {label: '诊次收益', value: 'avgProfit', align: 'right', formatter: row => proxy.$fn.TripartiteMethod(row.avgProfit)},
+    {label: '边际贡献', value: 'avgContributionMargin', align: 'right', formatter: row => proxy.$fn.TripartiteMethod(row.avgContributionMargin)},
+    {label: '边际贡献率(%)', value: 'avgContributionMarginRate', align: 'right'},
+  ],
+  data: []
+})
+
+const detailInfo = reactive({
+  type: 'income',
+  query: {},
+  visible: false
+})
+
+// 核算科室
+const deptTreeInfo = reactive({
+  title: '核算科室',
+  visible: false,
+  checkBox: false,
+  checkStrictly: true,
+  isLeaf: false,
+  mark: null,
+  api: sectiontree,
+  query: {}
+})
+
+onMounted(() => {
+  getDefaultPeriod()
+})
+
+function buildFilterParams() {
+  filterInfo.copyQuery = {
+    ...filterInfo.query,
+  }
+}
+
+function search() {
+  buildFilterParams()
+  for (const field of filterInfo.list.filter(field => field.required)) {
+    if (!filterInfo.copyQuery[field.value]) {
+      proxy.$message.warning(errorMessage(field))
+      return
+    }
+  }
+  getTopGraphics()
+}
+
+function getTopGraphics() {
+  contributionMarginAnalysisList(filterInfo.copyQuery).then(({success, data}) => {
+    pieSetData([
+    data?.map(it => {
+      return [it.profit, it.avgContributionMargin, it.deptName]
+    }) || []
+  ])
+  pieSetOption({
+    xAxis: { name: '诊次收益' },
+    yAxis: { name: '诊次边际贡献' }
+  })
+  barSetOption({
+    xAxis: { name: '成本' },
+    yAxis: { name: '收入' }
+  })
+  barSetData([
+    data?.map(it => {
+      return [it.totalCost, it.totalIncome, it.deptName]
+    }) || []
+  ])
+  tableInfo.data = data || []
+  })
+}
+
+function reset() {
+  filterInfo.query = {
+    costType: '1',
+    level: '1',
+    type: 1,
+  }
+  getDefaultPeriod()
+}
+
+function getDefaultPeriod() {
+  return periodMonthByDate({beginDate: moment(new Date()).format('YYYY-MM-DD 00:00:00')}).then(({data}) => {
+    const _data = data ? data[0] : {}
+    filterInfo.query.analysisStartPeriodId = _data.id
+    filterInfo.query.analysisStartPeriodName = _data.periodYearAndMonth
+    filterInfo.query.analysisEndPeriodId = _data.id
+    filterInfo.query.analysisEndPeriodName = _data.periodYearAndMonth
+    search()
+  })
+}
+
+function exportData() {
+  pageApportionmentLevelList(filterInfo.query).then((resp) => {
+    if (resp) {
+      proxy.$fn.parseExcel(resp)
+    }
+  })
+}
+
+function detailIncome(row) {
+  detailInfo.type = 'income'
+  detailInfo.query = {
+    ...filterInfo.copyQuery,
+    deptId: row.deptId,
+    rateMoney: row.totalIncome,
+  }
+  detailInfo.visible = true
+}
+
+function detailCost(row) {
+  detailInfo.type = 'cost'
+  detailInfo.query = {
+    ...filterInfo.copyQuery,
+    deptId: row.deptId,
+    rateMoney: row.totalCost,
+  }
+  detailInfo.visible = true
+}
+
+function openAccountingPeriodSelector(mark) {
+  tableParameter.type = 'accountingPeriod'
+  tableParameter.saveEmpty = false
+  tableParameter.callBack = (raw) => {
+    if (mark === 'end') {
+      filterInfo.query.analysisEndPeriodId = raw.id
+      filterInfo.query.analysisEndPeriodName = raw.periodYearAndMonth
+    } else {
+      filterInfo.query.analysisStartPeriodId = raw.id
+      filterInfo.query.analysisStartPeriodName = raw.periodYearAndMonth
+    }
+  }
+  openDialog(filterRef.value)
+}
+
+function openDeptSelector() {
+  deptTreeInfo.checkBox = true
+  deptTreeInfo.visible = true
+}
+
+function treeCallback(raw) {
+  filterInfo.query.sectionIdList = raw.map(it => it.id)
+  filterInfo.query.sectionName = raw.map(it => it.name).join(',')
+}
+</script>
+
+<template>
+  <div class="app-container">
+    <div class="layui-card layui-col-md12" v-show="!detailInfo.visible">
+      <div class="filter-wrapper">
+        <PageFilter
+            ref="filterRef"
+            :listTypeInfo="filterInfo.options"
+            v-model:query="filterInfo.query"
+            :filter-btn="filterInfo.filterbtn"
+            :filter-list="filterInfo.list">
+          <template #filter-analysisStartPeriodName>
+            <el-input
+                v-model="filterInfo.query.analysisStartPeriodName"
+                class="not-mongolia" placeholder="请选择分析期间" :disabled="true"
+            >
+              <template #append>
+                <el-icon @click="openAccountingPeriodSelector">
+                  <Search/>
+                </el-icon>
+              </template>
+            </el-input>
+          </template>
+          <template #filter-analysisEndPeriodName>
+            <el-input
+                v-model="filterInfo.query.analysisEndPeriodName"
+                class="not-mongolia" placeholder="请选择分析期间" :disabled="true"
+            >
+              <template #append>
+                <el-icon @click="openAccountingPeriodSelector('end')">
+                  <Search/>
+                </el-icon>
+              </template>
+            </el-input>
+          </template>
+          <template #filter-sectionName>
+            <el-input
+                v-model="filterInfo.query.sectionName"
+                class="not-mongolia" placeholder="请选择核算科室" :disabled="true">
+              <template #append>
+                <el-icon @click="openDeptSelector">
+                  <Search/>
+                </el-icon>
+              </template>
+            </el-input>
+          </template>
+        </PageFilter>
+      </div>
+      <div class="filter-wrapper">
+        <new-page-filter :filter-btn="filterInfo.btnList"></new-page-filter>
+      </div>
+      <el-row :gutter="10">
+        <el-col :span="10">
+          <report-charts ref="pieRef" type="scatter">
+          </report-charts>
+        </el-col>
+        <el-col :span="14">
+          <report-charts ref="barChartRef" type="scatter" />
+        </el-col>
+      </el-row>
+      <div>
+        <div class="data-title">边际贡献分析</div>
+        <table-container
+            :field-list="tableInfo.fieldList"
+            :check-box="false"
+            :data="tableInfo.data"
+            tabIndex
+            :pager="false"
+        >
+          <template #col-totalIncome="{ row }">
+            <span class="slip-edit" @click="detailIncome(row)">{{ $fn.TripartiteMethod(row.totalIncome || '') }}</span>
+          </template>
+          <template #col-totalCost="{ row }">
+            <span class="slip-edit" @click="detailCost(row)">{{ $fn.TripartiteMethod(row.totalCost || '') }}</span>
+          </template>
+        </table-container>
+      </div>
+    </div>
+    <!--    查询核算科室-->
+    <SelectDeptArchivesTree
+        v-if="deptTreeInfo.visible"
+        v-model:showDialog="deptTreeInfo.visible"
+        :title="deptTreeInfo.title"
+        :checkStrictly="deptTreeInfo.checkStrictly"
+        :isLeaf="deptTreeInfo.isLeaf"
+        :query="deptTreeInfo.query"
+        :checkBox="deptTreeInfo.checkBox"
+        :api="deptTreeInfo.api"
+        :highlight-current="true"
+        @callback="treeCallback"/>
+    <detail v-if="detailInfo.visible" v-model:visible="detailInfo.visible" :type="detailInfo.type"
+            :query="detailInfo.query"/>
+  </div>
+</template>
+
+<style scoped lang="scss">
+.box-border {
+  border-radius: 5px;
+  border: 1px solid rgba(170, 170, 170, 1);
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, .2);
+}
+</style>

@@ -1,0 +1,156 @@
+import request from '@/utils/request'
+
+export function checkData(id) {
+    return request({
+        url: `/methodService/calculate/checkData/${id}`,
+        method: 'get',
+        btnCode: 'diseaseCostServiceUnitDataCheck:check'
+    })
+}
+
+export function pageCalcData(params) {
+    return request({
+        url: '/statistics/diseaseStatisticsCostIncome/page',
+        method: 'get',
+        params,
+        btnCode: 'diseaseCostServiceUnitCostCalc:list'
+    })
+}
+export function calcCalcData(params) {
+    return request({
+        url: `/methodService/calculate/costToIncomeRatio/${params.accountingPeriodId}`,
+        method: 'get',
+        btnCode: 'diseaseCostServiceUnitCostCalc:calc'
+    })
+}
+export function cancelCalcCalcData(params) {
+    return request({
+        url: `/methodService/calculate/cancelCostToIncomeRatio/${params.accountingPeriodId}`,
+        method: 'get',
+        btnCode: 'diseaseCostServiceUnitCostCalc:calc'
+    })
+}
+export function exportCalcData(params) {
+    return request({
+        url: '/statistics/diseaseStatisticsCostIncome/excel',
+        method: 'get',
+        params,
+        responseType: 'blob',
+        btnCode: 'diseaseCostServiceUnitCostCalc:export'
+    })
+}
+
+export function pageSecCalcData(data) {
+    return request({
+        url: '/statistics/diseaseStatistics/queryPatientCaseCost',
+        method: 'post',
+        data: {
+            ...data,
+            type: 3
+        },
+        btnCode: 'diseaseCostServiceUnitCostCalc:list'
+    })
+}
+export function calcSecCalcData(params) {
+    return request({
+        url: `/methodService/calculate/diseaseRatio/${params.accountingPeriodId}`,
+        method: 'get',
+        btnCode: 'diseaseCostServiceUnitCostCalc:calc'
+    })
+}
+export function cancelSecCalcCalcData(params) {
+    return request({
+        url: `/methodService/calculate/cancelDiseaseRatio/${params.accountingPeriodId}`,
+        method: 'get',
+        btnCode: 'diseaseCostServiceUnitCostCalc:calc'
+    })
+}
+export function exportSecCalcData(params) {
+    return request({
+        url: '/statistics/diseaseStatistics/excel',
+        method: 'get',
+        params: {
+            ...params,
+            type: 3
+        },
+        responseType: 'blob',
+        btnCode: 'diseaseCostServiceUnitCostCalc:export'
+    })
+}
+
+export function pageThrCalcData(data) {
+    return request({
+        url: '/statistics/diseaseStatistics/queryDeptDiseaseStatisPageList',
+        method: 'post',
+        data: {
+            ...data,
+            type: 3
+        },
+        btnCode: 'diseaseCostServiceUnitCostCalc:list'
+    })
+}
+export function calcThrCalcData(params) {
+    return request({
+        url: `/methodService/calculate/deptCount/${params.accountingPeriodId}`,
+        method: 'get',
+        btnCode: 'diseaseCostServiceUnitCostCalc:calc'
+    })
+}
+export function cancelThrCalcCalcData(params) {
+    return request({
+        url: `/methodService/calculate/cancelDeptCount/${params.accountingPeriodId}`,
+        method: 'get',
+        btnCode: 'diseaseCostServiceUnitCostCalc:calc'
+    })
+}
+export function exportThrCalcData(params) {
+    return request({
+        url: '/statistics/diseaseStatisticsHospital/excel',
+        method: 'get',
+        params: {
+            ...params,
+            type: 3
+        },
+        responseType: 'blob',
+        btnCode: 'diseaseCostServiceUnitCostCalc:export'
+    })
+}
+
+
+export function pageFourCalcData(params) {
+    return request({
+        url: '/statistics/diseaseStatisticsHospital/page',
+        method: 'get',
+        params: {
+            ...params,
+            type: 3
+        },
+        btnCode: 'diseaseCostServiceUnitCostCalc:list'
+    })
+}
+export function calcFourCalcData(params) {
+    return request({
+        url: `/methodService/calculate/hospitalDiseaseRatio/${params.accountingPeriodId}`,
+        method: 'get',
+        btnCode: 'diseaseCostServiceUnitCostCalc:calc'
+    })
+}
+export function cancelFourCalcCalcData(params) {
+    return request({
+        url: `/methodService/calculate/cancelHospitalDiseaseRatio/${params.accountingPeriodId}`,
+        method: 'get',
+        btnCode: 'diseaseCostServiceUnitCostCalc:calc'
+    })
+}
+export function exportFourCalcData(params) {
+    return request({
+        url: '/statistics/diseaseStatisticsHospital/excel',
+        method: 'get',
+        params: {
+            ...params,
+            type: 3
+        },
+        responseType: 'blob',
+        btnCode: 'diseaseCostServiceUnitCostCalc:export'
+    })
+}
